@@ -459,7 +459,7 @@ renderer/rendering_method.mobile="gl_compatibility"`;
     }
 
     // Create an assistant message bubble that we will stream text into.
-    const { wrap: streamingMsg, bubble: streamingBubble } = makeStreamingMessage();
+    const stream = makeStreamingMessage();
 
     try {
       const body = { messages: apiMessages, stream: true };
@@ -473,32 +473,29 @@ renderer/rendering_method.mobile="gl_compatibility"`;
       });
 
       if (!resp.ok) {
-        streamingMsg.remove();
         const err = await resp.json().catch(() => ({}));
         const msg = err.error || ("HTTP " + resp.status);
-        addMessage("assistant", "⚠ " + msg);
+        finalizeStream(stream, "", "⚠ " + msg);
         return;
       }
 
       const ct = (resp.headers.get("Content-Type") || "").toLowerCase();
       let fullContent = "";
+      let streamError = "";
 
       if (ct.includes("event-stream")) {
-        fullContent = await readSSE(resp, streamingBubble);
+        const result = await readSSE(resp, stream);
+        fullContent = result.content || "";
+        streamError = result.error || "";
       } else {
-        // Non-streaming fallback (server returned JSON).
-        const data = await resp.json();
-        fullContent = data.content || "(empty response)";
-        streamingBubble.textContent = fullContent;
+        const data = await resp.json().catch(() => ({}));
+        fullContent = data.content || "";
+        stream.bubble.textContent = fullContent;
       }
 
-      // Replace the streaming bubble with a properly-rendered message
-      // (so markdown + project card render correctly).
-      streamingMsg.remove();
-      addMessage("assistant", fullContent);
+      finalizeStream(stream, fullContent, streamError);
     } catch (err) {
-      streamingMsg.remove();
-      addMessage("assistant", "⚠ Request failed: " + err.message);
+      finalizeStream(stream, "", "⚠ Request failed: " + err.message);
     } finally {
       setBusy(false);
     }
@@ -515,57 +512,122 @@ renderer/rendering_method.mobile="gl_compatibility"`;
       </div>`;
     messagesEl.appendChild(wrap);
     scrollToBottom();
-    const bubble = wrap.querySelector(".stream-text");
-    return { wrap, bubble };
+    return {
+      wrap,
+      bubbleHost: wrap.querySelector(".bubble"),
+      bubble: wrap.querySelector(".stream-text"),
+      typing: wrap.querySelector(".typing"),
+    };
   }
 
-  async function readSSE(resp, bubble) {
+  /*
+   * "Finalize" the streaming bubble in place — replace its raw text content
+   * with rendered markdown + (if present) the downloadable project card.
+   * If the stream produced no content, surface a clear error message so the
+   * user is never left looking at an empty bubble.
+   */
+  function finalizeStream(stream, content, errorMsg) {
+    if (stream.typing) stream.typing.remove();
+    const trimmed = (content || "").trim();
+
+    if (errorMsg && !trimmed) {
+      stream.bubbleHost.innerHTML = `<span style="color:var(--err);">${esc(errorMsg)}</span>`;
+      history.push({ role: "assistant", content: errorMsg, ts: Date.now() });
+      saveHistory();
+      return;
+    }
+
+    if (!trimmed) {
+      const empty = "⚠ The model returned an empty response. Try again, simplify the request, or switch models.";
+      stream.bubbleHost.innerHTML = `<span style="color:var(--err);">${esc(empty)}</span>`;
+      history.push({ role: "assistant", content: empty, ts: Date.now() });
+      saveHistory();
+      return;
+    }
+
+    // Render markdown + project card into the same bubble.
+    try {
+      const project = extractProject(content);
+      if (project) {
+        stream.bubbleHost.innerHTML = renderMarkdown(stripProjectBlock(content));
+        stream.bubbleHost.appendChild(renderProjectCard(project));
+      } else {
+        stream.bubbleHost.innerHTML = renderMarkdown(content);
+      }
+    } catch (e) {
+      // If rendering blows up, at least show the raw text so it's not lost.
+      stream.bubbleHost.textContent = content;
+    }
+
+    if (errorMsg) {
+      const note = document.createElement("div");
+      note.style.cssText = "margin-top:8px;color:var(--warn);font-size:13px;";
+      note.textContent = errorMsg;
+      stream.bubbleHost.appendChild(note);
+    }
+
+    history.push({ role: "assistant", content, ts: Date.now() });
+    saveHistory();
+    scrollToBottom();
+  }
+
+  /*
+   * Read a Server-Sent-Events stream from /api/chat and append content
+   * delta tokens to the bubble as they arrive.
+   * Returns { content, error }.
+   */
+  async function readSSE(resp, stream) {
     const reader = resp.body.getReader();
     const decoder = new TextDecoder("utf-8");
     let buf = "";
     let content = "";
+    let error = "";
     let lastScroll = 0;
 
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      buf += decoder.decode(value, { stream: true });
-
-      // Split on SSE event boundary (\n\n)
-      while (true) {
-        const idx = buf.indexOf("\n\n");
-        if (idx === -1) break;
-        const raw = buf.slice(0, idx);
-        buf = buf.slice(idx + 2);
-
-        // Each event may have several "data:" lines
-        for (const line of raw.split("\n")) {
-          const trimmed = line.startsWith("data:") ? line.slice(5).trim() : "";
-          if (!trimmed) continue;
-          if (trimmed === "[DONE]") continue;
-          let obj;
-          try { obj = JSON.parse(trimmed); } catch (e) { continue; }
-          // Error frame we injected server-side
-          if (obj.error) {
-            content += "\n\n⚠ " + obj.error;
-            bubble.textContent = content;
-            continue;
-          }
-          const delta = (((obj.choices || [])[0] || {}).delta || {}).content;
-          if (typeof delta === "string" && delta.length) {
-            content += delta;
-            bubble.textContent = content;
-            const now = performance.now();
-            if (now - lastScroll > 100) { // throttle auto-scroll
-              scrollToBottom();
-              lastScroll = now;
-            }
+    function processEvent(raw) {
+      for (const line of raw.split("\n")) {
+        const trimmed = line.startsWith("data:") ? line.slice(5).trim() : "";
+        if (!trimmed) continue;
+        if (trimmed === "[DONE]") continue;
+        let obj;
+        try { obj = JSON.parse(trimmed); } catch (e) { continue; }
+        if (obj.error) { error = String(obj.error); continue; }
+        const choices = obj.choices || [];
+        const choice = choices[0] || {};
+        const delta = (choice.delta && choice.delta.content) || (choice.message && choice.message.content);
+        if (typeof delta === "string" && delta.length) {
+          content += delta;
+          stream.bubble.textContent = content;
+          const now = performance.now();
+          if (now - lastScroll > 100) {
+            scrollToBottom();
+            lastScroll = now;
           }
         }
       }
     }
+
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buf += decoder.decode(value, { stream: true });
+        while (true) {
+          const idx = buf.indexOf("\n\n");
+          if (idx === -1) break;
+          const raw = buf.slice(0, idx);
+          buf = buf.slice(idx + 2);
+          processEvent(raw);
+        }
+      }
+      // Flush any remaining UTF-8 bytes and process any trailing event without \n\n.
+      buf += decoder.decode();
+      if (buf.trim()) processEvent(buf);
+    } catch (e) {
+      error = error || ("Stream read failed: " + (e && e.message ? e.message : e));
+    }
     scrollToBottom();
-    return content;
+    return { content, error };
   }
 
   function setBusy(b) {
