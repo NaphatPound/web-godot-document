@@ -12,36 +12,102 @@
 (function () {
   "use strict";
 
-  const SYSTEM_PROMPT = `You are an expert Godot 4 game engine assistant. The user will ask you to build a small Godot project. Respond with:
+  const SYSTEM_PROMPT = `You are an expert Godot 4.3 game engine assistant. The user will ask you to build a small game project. Respond with:
 
 1. A short explanation of what you are building (2-4 sentences).
-2. A project definition in a SINGLE fenced code block tagged "godot-project" containing valid JSON in this exact shape:
+2. A project definition in a SINGLE fenced code block tagged "godot-project" containing valid JSON matching this shape:
+   { "name": "...", "display_name": "...", "main_scene": "main.tscn", "description": "...", "files": { "<path>": "<file contents>" } }
 
-\`\`\`godot-project
-{
-  "name": "short_name_lowercase_with_underscores",
-  "display_name": "Human Readable Name",
-  "main_scene": "main.tscn",
-  "description": "One-sentence summary.",
-  "files": {
-    "project.godot": "FULL project.godot file contents (text)",
-    "icon.svg": "SVG content — use SVG only, never PNG/JPG",
-    "main.gd": "GDScript code",
-    "main.tscn": "Godot .tscn scene text file"
-  }
+YOU MUST FOLLOW THESE FILE FORMATS EXACTLY. Do NOT invent keys. Copy this TEMPLATE and change only what the task requires.
+
+=== project.godot TEMPLATE (copy verbatim, change config/name only) ===
+; Engine configuration file.
+
+config_version=5
+
+[application]
+
+config/name="My Game"
+run/main_scene="res://main.tscn"
+config/features=PackedStringArray("4.3", "GL Compatibility")
+config/icon="res://icon.svg"
+
+[input]
+
+ui_left={
+"deadzone": 0.5,
+"events": [Object(InputEventKey,"resource_local_to_scene":false,"resource_name":"","device":-1,"window_id":0,"alt_pressed":false,"shift_pressed":false,"ctrl_pressed":false,"meta_pressed":false,"pressed":false,"keycode":0,"physical_keycode":65,"key_label":0,"unicode":0,"echo":false,"script":null)
+, Object(InputEventKey,"resource_local_to_scene":false,"resource_name":"","device":-1,"window_id":0,"alt_pressed":false,"shift_pressed":false,"ctrl_pressed":false,"meta_pressed":false,"pressed":false,"keycode":4194319,"physical_keycode":0,"key_label":0,"unicode":0,"echo":false,"script":null)
+]
 }
-\`\`\`
+ui_right={
+"deadzone": 0.5,
+"events": [Object(InputEventKey,"resource_local_to_scene":false,"resource_name":"","device":-1,"window_id":0,"alt_pressed":false,"shift_pressed":false,"ctrl_pressed":false,"meta_pressed":false,"pressed":false,"keycode":0,"physical_keycode":68,"key_label":0,"unicode":0,"echo":false,"script":null)
+, Object(InputEventKey,"resource_local_to_scene":false,"resource_name":"","device":-1,"window_id":0,"alt_pressed":false,"shift_pressed":false,"ctrl_pressed":false,"meta_pressed":false,"pressed":false,"keycode":4194321,"physical_keycode":0,"key_label":0,"unicode":0,"echo":false,"script":null)
+]
+}
+ui_up={
+"deadzone": 0.5,
+"events": [Object(InputEventKey,"resource_local_to_scene":false,"resource_name":"","device":-1,"window_id":0,"alt_pressed":false,"shift_pressed":false,"ctrl_pressed":false,"meta_pressed":false,"pressed":false,"keycode":0,"physical_keycode":87,"key_label":0,"unicode":0,"echo":false,"script":null)
+, Object(InputEventKey,"resource_local_to_scene":false,"resource_name":"","device":-1,"window_id":0,"alt_pressed":false,"shift_pressed":false,"ctrl_pressed":false,"meta_pressed":false,"pressed":false,"keycode":4194320,"physical_keycode":0,"key_label":0,"unicode":0,"echo":false,"script":null)
+]
+}
+ui_down={
+"deadzone": 0.5,
+"events": [Object(InputEventKey,"resource_local_to_scene":false,"resource_name":"","device":-1,"window_id":0,"alt_pressed":false,"shift_pressed":false,"ctrl_pressed":false,"meta_pressed":false,"pressed":false,"keycode":0,"physical_keycode":83,"key_label":0,"unicode":0,"echo":false,"script":null)
+, Object(InputEventKey,"resource_local_to_scene":false,"resource_name":"","device":-1,"window_id":0,"alt_pressed":false,"shift_pressed":false,"ctrl_pressed":false,"meta_pressed":false,"pressed":false,"keycode":4194322,"physical_keycode":0,"key_label":0,"unicode":0,"echo":false,"script":null)
+]
+}
 
-Hard rules:
-- Target Godot 4.3 or later. In project.godot use: config_version=5 and config/features=PackedStringArray("4.3", "GL Compatibility").
-- Always include input actions ui_left/ui_right/ui_up/ui_down bound to both arrow keys AND WASD, and ui_accept bound to Space. Put these in the [input] section of project.godot. Use concrete InputEventKey entries (not shorthand).
-- Use SVG (icon.svg), never PNG or JPG. Referencing icon.png crashes the Godot Web Editor.
-- Reference icon.svg in config/icon="res://icon.svg".
-- Prefer a single main.tscn scene. If you need more scenes, use .tscn format and reference them correctly.
-- .tscn format must start with [gd_scene load_steps=... format=3 uid="uid://<random>"].
-- .gd scripts must begin with extends <BaseClass>. Use only stable Godot 4 API (CharacterBody2D.move_and_slide(), Input.get_vector, Area2D.body_entered, etc.).
-- Keep the project small — 1-5 files total is ideal.
-- Do NOT include anything except the explanation and the fenced godot-project block. No markdown headings, no extra code blocks.`;
+[rendering]
+
+renderer/rendering_method="gl_compatibility"
+renderer/rendering_method.mobile="gl_compatibility"
+=== END project.godot ===
+
+=== main.tscn TEMPLATE (a scene with a label and a script attached to root) ===
+[gd_scene load_steps=2 format=3 uid="uid://b2exampleab"]
+
+[ext_resource type="Script" path="res://main.gd" id="1_main"]
+
+[node name="Main" type="Node2D"]
+script = ExtResource("1_main")
+
+[node name="Label" type="Label" parent="."]
+offset_left = 500.0
+offset_top = 340.0
+offset_right = 780.0
+offset_bottom = 370.0
+text = "Hello"
+horizontal_alignment = 1
+=== END main.tscn ===
+
+=== main.gd TEMPLATE ===
+extends Node2D
+
+func _ready() -> void:
+    print("scene ready")
+=== END main.gd ===
+
+=== icon.svg TEMPLATE ===
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128">
+  <rect width="128" height="128" rx="16" fill="#478cbf"/>
+  <text x="64" y="86" font-family="Arial" font-size="72" fill="white" text-anchor="middle" font-weight="bold">G</text>
+</svg>
+=== END icon.svg ===
+
+HARD RULES (violating any causes the project to break):
+- Use these EXACT templates. Keep config/name, config/features, config/icon, run/main_scene keys exactly — slash separator, not underscore.
+- Every script reference in a .tscn needs an [ext_resource] declaration with a unique id, then script = ExtResource("<id>") on the node.
+- For ColorRect, Label, Button (Control-based nodes) use offset_left/offset_top/offset_right/offset_bottom for position, NOT position=Vector2(...).
+- For Node2D and its subclasses (Sprite2D, CharacterBody2D, RigidBody2D) use position = Vector2(x, y).
+- .tscn file MUST start with [gd_scene load_steps=N format=3 uid="uid://<random11chars>"] and load_steps must equal total ext_resource + sub_resource count + 1.
+- .gd file MUST start with extends <ClassName>.
+- Use SVG (icon.svg) — NEVER PNG or JPG. Referencing PNG/JPG crashes the Godot Web Editor.
+- Input actions must be the literal InputEventKey Object(...) format shown above — do NOT use shorthand.
+- Keep to 3-6 files total. Prefer single main.tscn + main.gd + icon.svg + project.godot.
+- Output ONLY: your 2-4 sentence explanation, then the \`\`\`godot-project ... \`\`\` fenced JSON block. Nothing else. No markdown headings. No extra code blocks.`;
 
   const messagesEl = document.getElementById("messages");
   const inputEl = document.getElementById("input");
@@ -173,15 +239,179 @@ Hard rules:
     return card;
   }
 
+  /*
+   * Fix common AI mistakes in generated projects so they actually open in Godot.
+   * Returns a cleaned { path: content } files map.
+   */
+  function cleanupProjectFiles(filesMap, projectMeta) {
+    const out = {};
+    let hasIconSvg = false;
+    let hasProjectGodot = false;
+
+    for (const [path, content] of Object.entries(filesMap)) {
+      const lower = path.toLowerCase();
+      // 1. Drop any PNG/JPG — they break the web editor.
+      if (lower.endsWith(".png") || lower.endsWith(".jpg") || lower.endsWith(".jpeg")) continue;
+
+      let text = typeof content === "string" ? content : String(content);
+
+      // 2. Fix project.godot — replace invented keys with real ones.
+      if (lower === "project.godot" || lower.endsWith("/project.godot")) {
+        hasProjectGodot = true;
+        text = fixProjectGodot(text, projectMeta);
+      }
+
+      // 3. Fix .tscn files (strip bad Control position= lines, fix load_steps).
+      if (lower.endsWith(".tscn")) {
+        text = fixTscn(text);
+      }
+
+      if (lower === "icon.svg" || lower.endsWith("/icon.svg")) hasIconSvg = true;
+      out[path] = text;
+    }
+
+    // Always ensure there's an icon.svg (references in project.godot fail without it).
+    if (!hasIconSvg) {
+      out["icon.svg"] = `<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128">
+  <rect width="128" height="128" rx="16" fill="#478cbf"/>
+  <text x="64" y="86" font-family="Arial" font-size="72" fill="white" text-anchor="middle" font-weight="bold">G</text>
+</svg>`;
+    }
+
+    // If project.godot is missing entirely, synthesise one.
+    if (!hasProjectGodot) {
+      out["project.godot"] = fixProjectGodot("", projectMeta);
+    }
+    return out;
+  }
+
+  function fixProjectGodot(text, meta) {
+    const name = (meta && (meta.display_name || meta.name)) || "My Game";
+    const mainScene = ((meta && meta.main_scene) || "main.tscn")
+      .replace(/^res:\/\//, "");
+
+    // Normalise any broken keys the model might have written.
+    let t = text || "";
+    t = t.replace(/^\s*name\s*=/gm, 'config/name=');
+    t = t.replace(/^\s*display_name\s*=/gm, 'config/name=');
+    t = t.replace(/^\s*main_scene\s*=/gm, 'run/main_scene=');
+    t = t.replace(/^\s*config_features\s*=/gm, 'config/features=');
+    t = t.replace(/^\s*config_icon\s*=/gm, 'config/icon=');
+    t = t.replace(/^\s*icon\s*=/gm, 'config/icon=');
+
+    // If we still don't have the essentials, rebuild fully.
+    const mustHave = ["config_version", "config/name", "run/main_scene", "config/features"];
+    const missing = mustHave.filter(k => !new RegExp("^\\s*" + k.replace("/", "\\/"), "m").test(t));
+    if (missing.length > 0) {
+      t = buildDefaultProjectGodot(name, mainScene);
+    } else if (!/\[application\]/.test(t)) {
+      // Keys exist but no [application] section — wrap them.
+      t = `config_version=5\n\n[application]\n\n` + t.replace(/^\s*config_version\s*=.*$/m, "");
+    }
+
+    // Ensure config/icon points at icon.svg (in case model wrote icon.png).
+    t = t.replace(/config\/icon\s*=\s*"[^"]*"/, 'config/icon="res://icon.svg"');
+    if (!/config\/icon\s*=/.test(t)) {
+      t = t.replace(/config\/features=.*$/m, (m) => m + '\nconfig/icon="res://icon.svg"');
+    }
+
+    // Ensure the input actions and rendering section are present.
+    if (!/\[input\]/.test(t)) t += "\n\n" + DEFAULT_INPUT_SECTION;
+    if (!/\[rendering\]/.test(t)) t += "\n\n" + DEFAULT_RENDERING_SECTION;
+
+    // Dedupe keys that often get written twice by the renamer — keep the LAST occurrence.
+    for (const key of ["config/name", "run/main_scene", "config/features", "config/icon"]) {
+      const re = new RegExp("^\\s*" + key.replace("/", "\\/") + "\\s*=.*$", "gm");
+      const matches = t.match(re);
+      if (matches && matches.length > 1) {
+        const keep = matches[matches.length - 1];
+        t = t.replace(re, "");
+        // insert back at first suitable spot (under [application])
+        t = t.replace(/(\[application\][^\[]*)/, (section) => section.trimEnd() + "\n" + keep + "\n");
+      }
+    }
+    // Collapse excess blank lines.
+    t = t.replace(/\n{3,}/g, "\n\n");
+    return t.trimStart();
+  }
+
+  function buildDefaultProjectGodot(name, mainScene) {
+    return `; Engine configuration file.
+
+config_version=5
+
+[application]
+
+config/name="${name.replace(/"/g, '\\"')}"
+run/main_scene="res://${mainScene}"
+config/features=PackedStringArray("4.3", "GL Compatibility")
+config/icon="res://icon.svg"
+
+${DEFAULT_INPUT_SECTION}
+
+${DEFAULT_RENDERING_SECTION}
+`;
+  }
+
+  const DEFAULT_INPUT_SECTION = `[input]
+
+ui_left={
+"deadzone": 0.5,
+"events": [Object(InputEventKey,"resource_local_to_scene":false,"resource_name":"","device":-1,"window_id":0,"alt_pressed":false,"shift_pressed":false,"ctrl_pressed":false,"meta_pressed":false,"pressed":false,"keycode":0,"physical_keycode":65,"key_label":0,"unicode":0,"echo":false,"script":null)
+, Object(InputEventKey,"resource_local_to_scene":false,"resource_name":"","device":-1,"window_id":0,"alt_pressed":false,"shift_pressed":false,"ctrl_pressed":false,"meta_pressed":false,"pressed":false,"keycode":4194319,"physical_keycode":0,"key_label":0,"unicode":0,"echo":false,"script":null)
+]
+}
+ui_right={
+"deadzone": 0.5,
+"events": [Object(InputEventKey,"resource_local_to_scene":false,"resource_name":"","device":-1,"window_id":0,"alt_pressed":false,"shift_pressed":false,"ctrl_pressed":false,"meta_pressed":false,"pressed":false,"keycode":0,"physical_keycode":68,"key_label":0,"unicode":0,"echo":false,"script":null)
+, Object(InputEventKey,"resource_local_to_scene":false,"resource_name":"","device":-1,"window_id":0,"alt_pressed":false,"shift_pressed":false,"ctrl_pressed":false,"meta_pressed":false,"pressed":false,"keycode":4194321,"physical_keycode":0,"key_label":0,"unicode":0,"echo":false,"script":null)
+]
+}
+ui_up={
+"deadzone": 0.5,
+"events": [Object(InputEventKey,"resource_local_to_scene":false,"resource_name":"","device":-1,"window_id":0,"alt_pressed":false,"shift_pressed":false,"ctrl_pressed":false,"meta_pressed":false,"pressed":false,"keycode":0,"physical_keycode":87,"key_label":0,"unicode":0,"echo":false,"script":null)
+, Object(InputEventKey,"resource_local_to_scene":false,"resource_name":"","device":-1,"window_id":0,"alt_pressed":false,"shift_pressed":false,"ctrl_pressed":false,"meta_pressed":false,"pressed":false,"keycode":4194320,"physical_keycode":0,"key_label":0,"unicode":0,"echo":false,"script":null)
+]
+}
+ui_down={
+"deadzone": 0.5,
+"events": [Object(InputEventKey,"resource_local_to_scene":false,"resource_name":"","device":-1,"window_id":0,"alt_pressed":false,"shift_pressed":false,"ctrl_pressed":false,"meta_pressed":false,"pressed":false,"keycode":0,"physical_keycode":83,"key_label":0,"unicode":0,"echo":false,"script":null)
+, Object(InputEventKey,"resource_local_to_scene":false,"resource_name":"","device":-1,"window_id":0,"alt_pressed":false,"shift_pressed":false,"ctrl_pressed":false,"meta_pressed":false,"pressed":false,"keycode":4194322,"physical_keycode":0,"key_label":0,"unicode":0,"echo":false,"script":null)
+]
+}`;
+
+  const DEFAULT_RENDERING_SECTION = `[rendering]
+
+renderer/rendering_method="gl_compatibility"
+renderer/rendering_method.mobile="gl_compatibility"`;
+
+  function fixTscn(text) {
+    let t = text;
+    // Recount load_steps so it matches actual ext/sub resource count + 1.
+    const extCount = (t.match(/^\[ext_resource\b/gm) || []).length;
+    const subCount = (t.match(/^\[sub_resource\b/gm) || []).length;
+    const loadSteps = Math.max(1, extCount + subCount + 1);
+    t = t.replace(/\[gd_scene(\s+load_steps\s*=\s*\d+)?(\s+[^\]]*)?\]/,
+      `[gd_scene load_steps=${loadSteps}$2]`);
+    // If no uid present, add one
+    if (!/uid="uid:\/\//.test(t)) {
+      const randomUid = "uid://b" + Math.random().toString(36).slice(2, 12);
+      t = t.replace(/\[gd_scene\s+load_steps=(\d+)\s*(?:format=3)?\s*\]/,
+        `[gd_scene load_steps=$1 format=3 uid="${randomUid}"]`);
+    }
+    // Ensure format=3
+    if (!/\bformat\s*=\s*3\b/.test(t)) {
+      t = t.replace(/\[gd_scene([^\]]*)\]/, "[gd_scene$1 format=3]");
+    }
+    return t;
+  }
+
   async function buildZip(project) {
     if (typeof JSZip === "undefined") throw new Error("JSZip failed to load");
+    const cleaned = cleanupProjectFiles(project.files, project);
     const zip = new JSZip();
-    for (const [path, content] of Object.entries(project.files)) {
-      const lower = path.toLowerCase();
-      if (lower.endsWith(".png") || lower.endsWith(".jpg") || lower.endsWith(".jpeg")) {
-        // Model disobeyed — skip image files to avoid the web editor hang.
-        continue;
-      }
+    for (const [path, content] of Object.entries(cleaned)) {
       zip.file(path, content);
     }
     return await zip.generateAsync({ type: "blob" });

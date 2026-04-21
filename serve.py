@@ -93,6 +93,7 @@ class COIHandler(SimpleHTTPRequestHandler):
             "messages": messages,
             "stream": False,
             "temperature": payload.get("temperature", 0.4),
+            "max_tokens": payload.get("max_tokens", 8192),
         }
 
         req = urllib.request.Request(
