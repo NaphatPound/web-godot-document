@@ -93,7 +93,7 @@ class COIHandler(SimpleHTTPRequestHandler):
             "messages": messages,
             "stream": False,
             "temperature": payload.get("temperature", 0.4),
-            "max_tokens": payload.get("max_tokens", 8192),
+            "max_tokens": payload.get("max_tokens", 4096),
         }
 
         req = urllib.request.Request(
@@ -108,7 +108,7 @@ class COIHandler(SimpleHTTPRequestHandler):
         )
 
         try:
-            with urllib.request.urlopen(req, timeout=120) as resp:
+            with urllib.request.urlopen(req, timeout=300) as resp:
                 raw = resp.read()
                 data = json.loads(raw.decode("utf-8"))
         except urllib.error.HTTPError as e:
