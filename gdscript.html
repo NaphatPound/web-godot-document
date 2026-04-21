@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>GDScript Reference — Learn Godot</title>
+<link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+<header class="site-header">
+  <div class="container header-inner">
+    <a class="brand" href="index.html">
+      <span class="brand-mark">◆</span>
+      <span class="brand-name">Learn<strong>Godot</strong></span>
+    </a>
+    <nav class="main-nav">
+      <a href="index.html">Home</a>
+      <a href="nodes.html">Nodes</a>
+      <a href="gdscript.html" class="active">GDScript</a>
+      <a href="tutorials.html">Tutorials</a>
+      <a href="playground.html">Playground</a>
+      <a href="sandbox.html">Sandbox</a>
+    </nav>
+    <button class="theme-toggle" id="themeToggle">◐</button>
+  </div>
+</header>
+
+<div class="doc-layout">
+  <aside class="doc-sidebar">
+    <input type="search" id="gdFilter" placeholder="Filter topics…" />
+    <div id="gdSidebar"></div>
+  </aside>
+  <main class="doc-content" id="gdContent"></main>
+</div>
+
+<footer class="site-footer">
+  <div class="container">
+    <p>Official GDScript docs: <a href="https://docs.godotengine.org/en/stable/tutorials/scripting/gdscript/gdscript_basics.html" target="_blank" rel="noopener">GDScript basics</a>.</p>
+  </div>
+</footer>
+
+<script src="js/data/nodes.js"></script>
+<script src="js/data/gdscript.js"></script>
+<script src="js/data/tutorials.js"></script>
+<script src="js/main.js"></script>
+<script>
+(function () {
+  const sidebar = document.getElementById("gdSidebar");
+  const content = document.getElementById("gdContent");
+  const filter = document.getElementById("gdFilter");
+  const items = window.LG_GDSCRIPT || [];
+
+  function esc(s) { return String(s == null ? "" : s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
+
+  function buildSidebar(query) {
+    const q = (query || "").trim().toLowerCase();
+    const bySection = {};
+    items.forEach(it => {
+      if (q && !(it.name.toLowerCase().includes(q) || (it.desc || "").toLowerCase().includes(q))) return;
+      const s = it.section || "Other";
+      (bySection[s] = bySection[s] || []).push(it);
+    });
+    const order = ["Basics","OOP","Annotations","Lifecycle","Signals","Built-ins","Input","Scene / tree","Scenes","Resources","Files","Advanced"];
+    const keys = Object.keys(bySection).sort((a, b) => {
+      const ai = order.indexOf(a), bi = order.indexOf(b);
+      return (ai === -1 ? 999 : ai) - (bi === -1 ? 999 : bi);
+    });
+    const parts = [];
+    keys.forEach(sec => {
+      parts.push('<div class="sidebar-group"><h4>' + sec + '</h4><ul>');
+      bySection[sec].forEach(it => {
+        parts.push('<li><a data-id="' + it.id + '" href="#' + it.id + '">' + it.name + '</a></li>');
+      });
+      parts.push('</ul></div>');
+    });
+    sidebar.innerHTML = parts.join("") || '<p class="muted small">No matches.</p>';
+    sidebar.querySelectorAll("a[data-id]").forEach(a => {
+      a.addEventListener("click", e => {
+        e.preventDefault();
+        render(a.dataset.id);
+        history.replaceState(null, "", "#" + a.dataset.id);
+      });
+    });
+  }
+
+  function render(id) {
+    const it = items.find(x => x.id === id);
+    if (!it) return;
+    sidebar.querySelectorAll("a[data-id]").forEach(a => {
+      a.classList.toggle("active", a.dataset.id === id);
+    });
+    const parts = [];
+    parts.push('<h1>' + esc(it.name) + '</h1>');
+    parts.push('<div class="tag-row"><span class="chip">' + esc(it.section) + '</span></div>');
+    parts.push('<p class="desc">' + esc(it.desc) + '</p>');
+    if (it.example) {
+      parts.push('<section class="doc-section"><h2>Example</h2><pre class="code"><code class="lang-gdscript">' + esc(it.example) + '</code></pre></section>');
+      parts.push('<section class="doc-section"><p class="muted">Want to run a variation? <a href="playground.html?load=' + encodeURIComponent(it.id) + '">Try it in the Playground →</a></p></section>');
+    }
+    content.innerHTML = parts.join("");
+    if (window.LG && window.LG.highlight) window.LG.highlight(content);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
+  filter.addEventListener("input", () => buildSidebar(filter.value));
+  buildSidebar("");
+
+  const hashId = location.hash.replace("#", "");
+  const initial = hashId && items.find(i => i.id === hashId) ? hashId : (items[0] && items[0].id);
+  if (initial) render(initial);
+
+  window.addEventListener("hashchange", () => {
+    const id = location.hash.replace("#", "");
+    if (id) render(id);
+  });
+})();
+</script>
+</body>
+</html>

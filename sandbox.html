@@ -1,0 +1,560 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Sandbox — Run real Godot in the browser</title>
+<link rel="stylesheet" href="css/style.css" />
+<style>
+  .sandbox-wrap {
+    max-width: 1280px;
+    margin: 0 auto;
+    padding: 24px 20px 40px;
+  }
+  .sandbox-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 16px;
+    flex-wrap: wrap;
+    margin-bottom: 16px;
+  }
+  .sandbox-head h1 { margin: 0 0 6px; }
+  .sandbox-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+
+  .iframe-shell {
+    position: relative;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+    height: 75vh;
+    min-height: 560px;
+  }
+  .iframe-shell iframe {
+    width: 100%; height: 100%;
+    border: 0; background: #0b1020;
+  }
+  .iframe-loading {
+    position: absolute; inset: 0;
+    display: flex; align-items: center; justify-content: center;
+    flex-direction: column; gap: 10px;
+    color: var(--text-dim); background: var(--panel);
+    pointer-events: none; font-size: 14px;
+  }
+  .iframe-loading .spinner {
+    width: 36px; height: 36px;
+    border: 3px solid var(--border);
+    border-top-color: var(--accent-2);
+    border-radius: 50%;
+    animation: spin 0.9s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .iframe-fallback {
+    position: absolute; inset: 0;
+    display: none;
+    align-items: center; justify-content: center;
+    flex-direction: column; gap: 12px;
+    padding: 30px; text-align: center;
+    background: var(--panel);
+  }
+  .iframe-fallback.show { display: flex; }
+
+  .examples-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    gap: 14px;
+    margin-top: 16px;
+  }
+  .example-card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 18px 18px 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    transition: all 0.15s;
+  }
+  .example-card:hover {
+    border-color: var(--accent-2);
+    transform: translateY(-2px);
+    box-shadow: var(--shadow);
+  }
+  .example-card .ex-icon { font-size: 28px; }
+  .example-card h3 { margin: 0; font-size: 16px; }
+  .example-card p {
+    margin: 0; color: var(--text-dim);
+    font-size: 13px; line-height: 1.5;
+    flex: 1;
+  }
+  .example-card .ex-actions {
+    display: flex; gap: 6px;
+    margin-top: 8px;
+  }
+  .example-card .ex-actions .btn {
+    flex: 1; font-size: 13px; padding: 8px 12px; text-align: center;
+  }
+
+  /* Modal */
+  .modal-backdrop {
+    position: fixed; inset: 0;
+    background: rgba(0, 0, 0, 0.7);
+    backdrop-filter: blur(4px);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 100;
+    padding: 20px;
+  }
+  .modal-backdrop.show { display: flex; }
+  .modal {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    max-width: 640px; width: 100%;
+    max-height: 85vh;
+    overflow-y: auto;
+    box-shadow: var(--shadow);
+  }
+  .modal-head {
+    padding: 18px 22px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .modal-head h3 { margin: 0; font-size: 17px; }
+  .modal-close {
+    background: transparent; border: none; color: var(--text-dim);
+    font-size: 22px; cursor: pointer; padding: 0 8px;
+  }
+  .modal-body { padding: 18px 22px; }
+  .modal-body ol { padding-left: 22px; }
+  .modal-body li { margin: 10px 0; line-height: 1.55; }
+  .modal-body .tag {
+    display: inline-block;
+    background: var(--accent-soft);
+    color: var(--accent-2);
+    padding: 1px 8px;
+    border-radius: 10px;
+    font-size: 12px;
+    margin-right: 4px;
+  }
+  .modal-foot {
+    padding: 14px 22px;
+    border-top: 1px solid var(--border);
+    display: flex; gap: 8px;
+    justify-content: flex-end;
+    flex-wrap: wrap;
+  }
+  .download-note {
+    background: var(--bg-3);
+    padding: 10px 14px;
+    border-radius: 6px;
+    font-size: 13px;
+    margin: 12px 0;
+  }
+
+  .toast {
+    position: fixed;
+    bottom: 24px; left: 50%;
+    transform: translateX(-50%) translateY(100px);
+    background: var(--accent);
+    color: #fff;
+    padding: 10px 18px;
+    border-radius: 8px;
+    box-shadow: var(--shadow);
+    font-size: 14px;
+    z-index: 200;
+    transition: transform 0.3s;
+  }
+  .toast.show { transform: translateX(-50%) translateY(0); }
+
+  .tips {
+    margin-top: 24px;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 14px;
+  }
+  .tip {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 16px 18px;
+  }
+</style>
+</head>
+<body>
+<header class="site-header">
+  <div class="container header-inner">
+    <a class="brand" href="index.html">
+      <span class="brand-mark">◆</span>
+      <span class="brand-name">Learn<strong>Godot</strong></span>
+    </a>
+    <nav class="main-nav">
+      <a href="index.html">Home</a>
+      <a href="nodes.html">Nodes</a>
+      <a href="gdscript.html">GDScript</a>
+      <a href="tutorials.html">Tutorials</a>
+      <a href="playground.html">Playground</a>
+      <a href="sandbox.html" class="active">Sandbox</a>
+    </nav>
+    <button class="theme-toggle" id="themeToggle">◐</button>
+  </div>
+</header>
+
+<main class="sandbox-wrap">
+  <div class="sandbox-head">
+    <div>
+      <h1>Godot Sandbox</h1>
+      <p class="muted" style="margin:0;max-width:640px;">
+        The real Godot engine running in your browser (WebAssembly). Create scenes, add nodes,
+        write GDScript and press Play — no install required. This is the official
+        <a href="https://editor.godotengine.org/" target="_blank" rel="noopener">Godot Web Editor</a>.
+      </p>
+    </div>
+    <div class="sandbox-actions">
+      <button class="btn btn-ghost" id="reloadBtn">↻ Reload</button>
+      <a class="btn btn-primary" id="openNewTab" href="https://editor.godotengine.org/" target="_blank" rel="noopener">Open in new tab ↗</a>
+    </div>
+  </div>
+
+  <!-- Runtime diagnostic -->
+  <div id="coiDiag" style="display:none;margin-bottom:16px;"></div>
+
+  <h2 style="margin-top:10px;">Example projects — one click to open</h2>
+  <p class="muted" style="margin-top:0;max-width:760px;">
+    Click <strong>Open in sandbox</strong> on any card: the project zip downloads and a new tab opens
+    with the Godot launcher. On that launcher page, find the field <strong>"Preload project ZIP"</strong>,
+    pick the downloaded zip, and click <strong>Start Godot editor</strong>. A dialog here will walk you through it.
+  </p>
+  <p class="muted small" style="margin-top:-4px;max-width:760px;">
+    Popup blocker active? Allow popups from this site, or click <em>Open launcher in new tab</em> in the dialog.
+  </p>
+  <div class="examples-grid" id="examplesGrid"></div>
+
+  <h2 style="margin-top:32px;">Optional: try the embedded editor below</h2>
+  <p class="muted" style="margin-top:-6px;">
+    Embedding Godot directly in a page is fragile — it depends on browser support for cross-origin isolation
+    and a correctly configured server. The <strong>new tab</strong> flow above always works. Use the embed below
+    if it happens to load; otherwise just stick with the new tab.
+  </p>
+  <div id="coiBanner" class="callout" hidden>
+    <strong>Heads up:</strong> this page isn't cross-origin isolated in your browser, so the
+    embedded editor below won't start. This is a browser/server limitation, <em>not</em> a problem with
+    your project — the <strong>new tab</strong> path above runs the real Godot editor just fine.
+  </div>
+
+  <div class="iframe-shell" id="iframeShell">
+    <iframe
+      id="godotFrame"
+      src="https://editor.godotengine.org/"
+      title="Godot Web Editor"
+      allow="cross-origin-isolated; fullscreen; autoplay; clipboard-read; clipboard-write"
+      credentialless
+      allowfullscreen></iframe>
+    <div class="iframe-loading" id="iframeLoading">
+      <div class="spinner"></div>
+      <div>Loading Godot (this downloads ~50MB on first run)…</div>
+    </div>
+    <div class="iframe-fallback" id="iframeFallback">
+      <h3>Couldn't load Godot here</h3>
+      <p style="color:var(--text-dim);max-width:520px;">
+        The Godot Web Editor needs a cross-origin isolated context that this page can't always provide
+        when embedded. Click the button below to open the full editor in a new tab.
+      </p>
+      <a class="btn btn-primary" href="https://editor.godotengine.org/" target="_blank" rel="noopener">Open Godot Web Editor ↗</a>
+    </div>
+  </div>
+
+  <h2 style="margin-top:28px;">Tips</h2>
+  <div class="tips">
+    <div class="tip">
+      <h4>Save your work</h4>
+      <p style="margin:0;color:var(--text-dim);font-size:13px;">Before closing the tab, use <strong>Project → Tools → Download project</strong> to keep your project as a zip.</p>
+    </div>
+    <div class="tip">
+      <h4>Back to project list</h4>
+      <p style="margin:0;color:var(--text-dim);font-size:13px;">In the editor: <strong>Project → Quit to Project List</strong>.</p>
+    </div>
+    <div class="tip">
+      <h4>Run the scene</h4>
+      <p style="margin:0;color:var(--text-dim);font-size:13px;">Press <kbd>F5</kbd>. If asked, pick the current scene as the main scene.</p>
+    </div>
+    <div class="tip">
+      <h4>Web editor limits</h4>
+      <p style="margin:0;color:var(--text-dim);font-size:13px;">No GDExtension / C# / plugin add-ons in the web build. Use desktop Godot for those.</p>
+    </div>
+  </div>
+</main>
+
+<!-- Modal with import instructions -->
+<div class="modal-backdrop" id="importModal">
+  <div class="modal">
+    <div class="modal-head">
+      <h3 id="modalTitle">Open "Hello 2D" in the sandbox</h3>
+      <button class="modal-close" id="modalClose" aria-label="Close">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="download-note">
+        <strong>✅ Step 1/4 — Downloaded:</strong> <code id="modalZipName">hello-2d.zip</code> is in your Downloads folder.
+      </div>
+      <p><strong>✅ Step 2/4 — A new tab just opened</strong> with the Godot launcher page (<code>editor.godotengine.org</code>). Switch to that tab to continue. If a popup was blocked, click the button below.</p>
+      <p><strong>Step 3/4 — On the launcher page, load your zip:</strong></p>
+      <ol>
+        <li>Scroll to the field labelled <strong>"Preload project ZIP"</strong>.</li>
+        <li>Click <strong>Choose File</strong> next to it and pick the downloaded <code id="modalZipName2">hello-2d.zip</code>.</li>
+        <li>Click the big <strong>"Start Godot editor"</strong> button. Wait ~20 seconds.</li>
+        <li>When the <em>Install Project</em> dialog appears, keep the default folder name, click <strong>Create Folder</strong>, then <strong>Install &amp; Edit</strong>.</li>
+      </ol>
+      <p><strong>Step 4/4 — Play:</strong> Once the editor is open, press <kbd>F5</kbd>. If asked for a main scene, pick the <code>.tscn</code> file in the <em>res://</em> folder.</p>
+      <div class="callout warn">
+        <strong>Important:</strong> the <em>Preload project ZIP</em> field is on the <u>launcher page</u> — the first page you see. It is <u>not</u> inside the Project Manager. Do not use the <em>Import</em> button there; it has a bug with zipped projects.
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-ghost" id="modalRedownload">↻ Download again</button>
+      <a class="btn btn-primary" id="modalOpenTab" href="https://editor.godotengine.org/" target="_blank" rel="noopener">Open launcher in new tab ↗</a>
+      <button class="btn btn-ghost" id="modalScrollEditor">Dismiss</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<footer class="site-footer">
+  <div class="container">
+    <p>
+      The Godot Web Editor is maintained by the Godot team. Reference:
+      <a href="https://docs.godotengine.org/en/stable/about/introduction.html" target="_blank" rel="noopener">docs.godotengine.org</a>.
+    </p>
+  </div>
+</footer>
+
+<!-- JSZip for generating project archives in-browser -->
+<script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+
+<script src="js/data/nodes.js"></script>
+<script src="js/data/gdscript.js"></script>
+<script src="js/data/tutorials.js"></script>
+<script src="js/data/examples.js"></script>
+<script src="js/main.js"></script>
+<script>
+(function () {
+  const frame = document.getElementById("godotFrame");
+  const loading = document.getElementById("iframeLoading");
+  const fallback = document.getElementById("iframeFallback");
+  const reloadBtn = document.getElementById("reloadBtn");
+
+  // Detect cross-origin isolation. If false, the Godot iframe will not work.
+  const isoBanner = document.getElementById("coiBanner");
+  const diag = document.getElementById("coiDiag");
+  const isIsolated = !!window.crossOriginIsolated;
+  const sab = typeof SharedArrayBuffer !== "undefined";
+  const ua = navigator.userAgent;
+
+  function renderDiag() {
+    const status = isIsolated ? "READY" : "NOT ISOLATED";
+    const color = isIsolated ? "var(--ok, #4ade80)" : "var(--err, #f87171)";
+    const bg = isIsolated ? "rgba(74,222,128,0.08)" : "rgba(248,113,113,0.08)";
+    diag.style.display = "block";
+    diag.innerHTML = `
+      <div style="background:${bg};border:1px solid ${color};border-radius:10px;padding:14px 18px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
+          <div>
+            <strong style="color:${color};">Embed status: ${status}</strong>
+            — <code>crossOriginIsolated = ${isIsolated}</code>,
+            <code>SharedArrayBuffer = ${sab ? "available" : "blocked"}</code>
+          </div>
+          <button id="diagToggle" style="background:transparent;border:1px solid var(--border);color:var(--text);padding:4px 10px;border-radius:4px;cursor:pointer;font-size:12px;">Details</button>
+        </div>
+        <div id="diagDetails" style="display:none;margin-top:10px;font-size:13px;color:var(--text-dim);">
+          ${isIsolated
+            ? `<p style="margin:4px 0;">✓ The server is sending <code>Cross-Origin-Opener-Policy</code> and <code>Cross-Origin-Embedder-Policy</code> correctly. The embedded Godot editor should load below (may take ~20s).</p>`
+            : `
+              <p style="margin:4px 0;"><strong>The iframe below will not be able to start the Godot engine.</strong> You have two easy fixes:</p>
+              <ol style="margin:6px 0 10px 20px;">
+                <li><strong>Hard-refresh this page</strong> (Mac: <kbd>⌘</kbd>+<kbd>Shift</kbd>+<kbd>R</kbd>, Windows: <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>R</kbd>) — your browser probably cached the page from before the headers were set.</li>
+                <li>If that doesn't work, make sure the site is served by <code>python3 serve.py</code> (not the bare <code>python3 -m http.server</code>).</li>
+                <li>If that still doesn't work, your browser may not support <code>Cross-Origin-Embedder-Policy: credentialless</code> — use a recent Chrome, Edge, or Firefox. Safari needs 17.2 or newer.</li>
+              </ol>
+              <p style="margin:4px 0;">Meanwhile, the <strong>Open in new tab</strong> button (top right) works right now — the Godot site sets its own isolation headers there.</p>
+              <p style="margin:10px 0 4px;"><strong>Your browser:</strong> <code style="font-size:11px;">${ua.replace(/</g, "&lt;")}</code></p>
+            `
+          }
+        </div>
+      </div>`;
+    const toggle = document.getElementById("diagToggle");
+    const details = document.getElementById("diagDetails");
+    if (!isIsolated) details.style.display = "block";
+    toggle.addEventListener("click", () => {
+      details.style.display = details.style.display === "none" ? "block" : "none";
+    });
+  }
+  renderDiag();
+
+  if (!isIsolated) {
+    isoBanner.hidden = false;
+    // Skip loading attempt — the iframe will just hang or block anyway.
+    loading.style.display = "none";
+    fallback.classList.add("show");
+    // Hide the iframe so no blank box is shown under the fallback.
+    frame.style.display = "none";
+  }
+
+  let loaded = false;
+  frame.addEventListener("load", () => {
+    loaded = true;
+    setTimeout(() => { loading.style.display = "none"; }, 800);
+  });
+  setTimeout(() => {
+    if (!loaded) {
+      loading.style.display = "none";
+      fallback.classList.add("show");
+    }
+  }, 25000);
+
+  reloadBtn.addEventListener("click", () => {
+    loaded = false;
+    fallback.classList.remove("show");
+    loading.style.display = "flex";
+    frame.src = frame.src;
+  });
+
+  /* ---- Example gallery ---- */
+  const grid = document.getElementById("examplesGrid");
+  const examples = window.LG_EXAMPLES || [];
+  const modal = document.getElementById("importModal");
+  const modalTitle = document.getElementById("modalTitle");
+  const modalZipName = document.getElementById("modalZipName");
+  const modalZipName2 = document.getElementById("modalZipName2");
+  const modalClose = document.getElementById("modalClose");
+  const modalRedownload = document.getElementById("modalRedownload");
+  const modalScrollEditor = document.getElementById("modalScrollEditor");
+  const toastEl = document.getElementById("toast");
+
+  function esc(s) { return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
+
+  function toast(msg, ms) {
+    toastEl.textContent = msg;
+    toastEl.classList.add("show");
+    clearTimeout(toast._t);
+    toast._t = setTimeout(() => toastEl.classList.remove("show"), ms || 2400);
+  }
+
+  grid.innerHTML = examples.map((ex, i) => `
+    <div class="example-card" data-i="${i}">
+      <div class="ex-icon">${ex.icon || "📦"}</div>
+      <h3>${esc(ex.name)}</h3>
+      <p>${esc(ex.description)}</p>
+      <div class="ex-actions">
+        <button class="btn btn-primary" data-action="open" data-i="${i}">▶ Open in sandbox</button>
+        <button class="btn btn-ghost" data-action="download" data-i="${i}" title="Download the zip">⬇</button>
+      </div>
+    </div>
+  `).join("");
+
+  async function makeZip(ex) {
+    if (typeof JSZip === "undefined") throw new Error("JSZip failed to load (check your internet connection).");
+    const zip = new JSZip();
+    for (const [path, content] of Object.entries(ex.files)) {
+      if (path.endsWith(".png")) {
+        // raw binary string → Uint8Array
+        const bytes = new Uint8Array(content.length);
+        for (let i = 0; i < content.length; i++) bytes[i] = content.charCodeAt(i) & 0xff;
+        zip.file(path, bytes);
+      } else {
+        zip.file(path, content);
+      }
+    }
+    return await zip.generateAsync({ type: "blob" });
+  }
+
+  function triggerDownload(blob, filename) {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 4000);
+  }
+
+  let currentExample = null;
+
+  async function openExample(ex) {
+    try {
+      toast("Preparing " + ex.name + "…");
+      const blob = await makeZip(ex);
+      const filename = ex.id + ".zip";
+      triggerDownload(blob, filename);
+      currentExample = ex;
+      modalTitle.textContent = 'Open "' + ex.name + '" in Godot';
+      modalZipName.textContent = filename;
+      if (modalZipName2) modalZipName2.textContent = filename;
+      modal.classList.add("show");
+
+      // Always open the editor in a new tab — this is the reliable path.
+      // Browsers may block window.open if it isn't directly triggered by a user gesture;
+      // the click that got us here counts as a gesture, so this usually works.
+      const newTab = window.open("https://editor.godotengine.org/", "_blank", "noopener");
+      if (!newTab) {
+        toast("Popup blocked — click 'Open launcher in new tab' in the dialog.", 5000);
+      }
+
+      // Also try to load the iframe for users whose browsers support it.
+      if (isIsolated) {
+        try {
+          loaded = false;
+          loading.style.display = "flex";
+          fallback.classList.remove("show");
+          frame.style.display = "block";
+          frame.src = "https://editor.godotengine.org/?t=" + Date.now();
+        } catch (e) { /* ignore */ }
+      }
+    } catch (err) {
+      toast("Error: " + err.message, 4000);
+    }
+  }
+
+  async function downloadOnly(ex) {
+    try {
+      const blob = await makeZip(ex);
+      triggerDownload(blob, ex.id + ".zip");
+      toast("Downloaded " + ex.id + ".zip");
+    } catch (err) {
+      toast("Error: " + err.message, 4000);
+    }
+  }
+
+  grid.addEventListener("click", (e) => {
+    const btn = e.target.closest("button[data-action]");
+    if (!btn) return;
+    const i = parseInt(btn.dataset.i, 10);
+    const ex = examples[i];
+    if (btn.dataset.action === "open") openExample(ex);
+    else if (btn.dataset.action === "download") downloadOnly(ex);
+  });
+
+  modalClose.addEventListener("click", () => modal.classList.remove("show"));
+  modal.addEventListener("click", (e) => {
+    if (e.target === modal) modal.classList.remove("show");
+  });
+  modalRedownload.addEventListener("click", () => {
+    if (currentExample) downloadOnly(currentExample);
+  });
+  modalScrollEditor.addEventListener("click", () => {
+    modal.classList.remove("show");
+    document.getElementById("iframeShell").scrollIntoView({ behavior: "smooth" });
+  });
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && modal.classList.contains("show")) {
+      modal.classList.remove("show");
+    }
+  });
+})();
+</script>
+</body>
+</html>

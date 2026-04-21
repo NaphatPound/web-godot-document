@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Tutorials — Learn Godot</title>
+<link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+<header class="site-header">
+  <div class="container header-inner">
+    <a class="brand" href="index.html">
+      <span class="brand-mark">◆</span>
+      <span class="brand-name">Learn<strong>Godot</strong></span>
+    </a>
+    <nav class="main-nav">
+      <a href="index.html">Home</a>
+      <a href="nodes.html">Nodes</a>
+      <a href="gdscript.html">GDScript</a>
+      <a href="tutorials.html" class="active">Tutorials</a>
+      <a href="playground.html">Playground</a>
+      <a href="sandbox.html">Sandbox</a>
+    </nav>
+    <button class="theme-toggle" id="themeToggle">◐</button>
+  </div>
+</header>
+
+<main class="container" style="padding: 30px 20px 60px;">
+  <h1 style="margin:0 0 6px;">Interactive tutorials</h1>
+  <p class="muted">Work through the lessons in order. Each one ends with a quick quiz to check your understanding.</p>
+
+  <div class="lesson-nav" id="lessonNav"></div>
+  <div id="progressBar" style="height:6px;background:var(--bg-3);border-radius:3px;margin-bottom:24px;overflow:hidden;">
+    <div id="progressFill" style="height:100%;width:0;background:var(--accent);transition:width 0.3s;"></div>
+  </div>
+
+  <div id="lessonHost"></div>
+
+  <div id="lessonFooterNav" style="display:flex;justify-content:space-between;margin-top:24px;">
+    <button class="btn btn-ghost" id="prevLesson">← Previous</button>
+    <button class="btn btn-primary" id="nextLesson">Next →</button>
+  </div>
+</main>
+
+<footer class="site-footer">
+  <div class="container">
+    <p>These lessons cover the same ideas as <a href="https://docs.godotengine.org/en/stable/getting_started/first_2d_game/index.html" target="_blank" rel="noopener">Your first 2D game</a> in the official docs.</p>
+  </div>
+</footer>
+
+<script src="js/data/nodes.js"></script>
+<script src="js/data/gdscript.js"></script>
+<script src="js/data/tutorials.js"></script>
+<script src="js/main.js"></script>
+<script>
+(function () {
+  const tutorials = window.LG_TUTORIALS || [];
+  const nav = document.getElementById("lessonNav");
+  const host = document.getElementById("lessonHost");
+  const progressFill = document.getElementById("progressFill");
+  const prevBtn = document.getElementById("prevLesson");
+  const nextBtn = document.getElementById("nextLesson");
+
+  let currentIndex = 0;
+  const completed = JSON.parse(localStorage.getItem("lg-quiz-completed") || "{}");
+
+  function esc(s) { return String(s == null ? "" : s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
+
+  function renderNav() {
+    nav.innerHTML = tutorials.map((t, i) =>
+      `<button data-i="${i}" class="${i === currentIndex ? "active" : ""}">${completed[t.id] ? "✓ " : ""}${esc(t.title)}</button>`
+    ).join("");
+    nav.querySelectorAll("button").forEach(b => {
+      b.addEventListener("click", () => setLesson(parseInt(b.dataset.i, 10)));
+    });
+    const done = Object.keys(completed).length;
+    progressFill.style.width = (done / tutorials.length * 100) + "%";
+  }
+
+  function renderBody(t) {
+    const parts = [];
+    parts.push('<div class="lesson">');
+    parts.push('<h2>' + esc(t.title) + '</h2>');
+    parts.push('<div class="lesson-meta">⏱ ' + esc(t.estimate) + ' · ' + esc(t.summary) + '</div>');
+
+    t.body.forEach(block => {
+      if (block.type === "p") parts.push("<p>" + block.text + "</p>");
+      else if (block.type === "h3") parts.push("<h3>" + block.text + "</h3>");
+      else if (block.type === "ol") parts.push("<ol>" + block.items.map(li => "<li>" + li + "</li>").join("") + "</ol>");
+      else if (block.type === "ul") parts.push("<ul>" + block.items.map(li => "<li>" + li + "</li>").join("") + "</ul>");
+      else if (block.type === "code") parts.push('<pre class="code"><code class="lang-gdscript">' + esc(block.text) + '</code></pre>');
+      else if (block.type === "pre") parts.push('<pre class="code"><code>' + esc(block.text) + '</code></pre>');
+      else if (block.type === "callout") parts.push('<div class="callout">' + block.text + '</div>');
+    });
+
+    if (t.quiz) {
+      parts.push('<div class="quiz" data-quiz="' + esc(t.id) + '">');
+      parts.push('<div class="quiz-question">Quiz: ' + t.quiz.question + '</div>');
+      parts.push('<ul class="quiz-options">');
+      t.quiz.options.forEach((opt, i) => {
+        parts.push('<li><button data-i="' + i + '">' + opt + '</button></li>');
+      });
+      parts.push('</ul>');
+      parts.push('<div class="quiz-feedback" hidden></div>');
+      parts.push('</div>');
+    }
+    parts.push('</div>');
+    return parts.join("");
+  }
+
+  function wireQuiz(t) {
+    const root = host.querySelector('[data-quiz="' + t.id + '"]');
+    if (!root) return;
+    const feedback = root.querySelector(".quiz-feedback");
+    root.querySelectorAll(".quiz-options button").forEach(btn => {
+      btn.addEventListener("click", () => {
+        const i = parseInt(btn.dataset.i, 10);
+        root.querySelectorAll(".quiz-options button").forEach(b => b.disabled = true);
+        if (i === t.quiz.correct) {
+          btn.classList.add("correct");
+          feedback.hidden = false;
+          feedback.className = "quiz-feedback ok";
+          feedback.innerHTML = "✅ Correct! " + t.quiz.explain;
+          completed[t.id] = true;
+          localStorage.setItem("lg-quiz-completed", JSON.stringify(completed));
+          renderNav();
+        } else {
+          btn.classList.add("wrong");
+          const correctBtn = root.querySelectorAll(".quiz-options button")[t.quiz.correct];
+          if (correctBtn) correctBtn.classList.add("correct");
+          feedback.hidden = false;
+          feedback.className = "quiz-feedback err";
+          feedback.innerHTML = "❌ Not quite. " + t.quiz.explain;
+        }
+      });
+    });
+  }
+
+  function setLesson(i) {
+    if (i < 0 || i >= tutorials.length) return;
+    currentIndex = i;
+    const t = tutorials[i];
+    host.innerHTML = renderBody(t);
+    if (window.LG && window.LG.highlight) window.LG.highlight(host);
+    wireQuiz(t);
+    renderNav();
+    prevBtn.disabled = currentIndex === 0;
+    nextBtn.disabled = currentIndex === tutorials.length - 1;
+    history.replaceState(null, "", "#" + t.id);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
+  prevBtn.addEventListener("click", () => setLesson(currentIndex - 1));
+  nextBtn.addEventListener("click", () => setLesson(currentIndex + 1));
+
+  const hashId = location.hash.replace("#", "");
+  const hashIdx = tutorials.findIndex(t => t.id === hashId);
+  setLesson(hashIdx === -1 ? 0 : hashIdx);
+})();
+</script>
+</body>
+</html>

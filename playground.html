@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Playground — Learn Godot</title>
+<link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+<header class="site-header">
+  <div class="container header-inner">
+    <a class="brand" href="index.html">
+      <span class="brand-mark">◆</span>
+      <span class="brand-name">Learn<strong>Godot</strong></span>
+    </a>
+    <nav class="main-nav">
+      <a href="index.html">Home</a>
+      <a href="nodes.html">Nodes</a>
+      <a href="gdscript.html">GDScript</a>
+      <a href="tutorials.html">Tutorials</a>
+      <a href="playground.html" class="active">Playground</a>
+      <a href="sandbox.html">Sandbox</a>
+    </nav>
+    <button class="theme-toggle" id="themeToggle">◐</button>
+  </div>
+</header>
+
+<main>
+  <div class="container" style="padding: 24px 20px 0;">
+    <h1 style="margin:0 0 6px;">GDScript Playground</h1>
+    <p class="muted">Write code on the left, press <strong>Run</strong> (or <kbd>Ctrl</kbd>+<kbd>Enter</kbd>). A subset of GDScript runs directly in your browser — no Godot required.</p>
+  </div>
+
+  <div class="playground">
+    <div class="playground-pane">
+      <div class="pane-head">
+        <span>script.gd</span>
+        <div class="actions">
+          <select id="presetSel" title="Load an example"></select>
+          <button id="resetBtn">Reset</button>
+          <button id="runBtn" class="primary">▶ Run</button>
+        </div>
+      </div>
+      <textarea id="editor" spellcheck="false"></textarea>
+    </div>
+
+    <div class="playground-pane">
+      <div class="pane-head">
+        <span>Output</span>
+        <div class="actions">
+          <button id="clearBtn">Clear</button>
+        </div>
+      </div>
+      <div id="output"></div>
+    </div>
+  </div>
+
+  <div class="container" style="padding: 0 20px 40px;">
+    <div class="callout warn">
+      <strong>What the playground supports:</strong> var/const, types (accepted, not enforced), if/elif/else, for, while, break, continue, func, return, arrays, dictionaries, Vector2, basic math, <code>print</code>, <code>printerr</code>, <code>len</code>, <code>range</code>, <code>randi</code>, <code>randf</code>, <code>lerp</code>, <code>clamp</code>, etc. A <code>_ready()</code> function is called automatically.<br /><br />
+      <strong>Not supported:</strong> scenes, nodes, signals, <code>extends</code>, <code>class_name</code>, <code>await</code>, <code>match</code>, Node API calls. Use real Godot for those.
+    </div>
+  </div>
+</main>
+
+<footer class="site-footer">
+  <div class="container">
+    <p>See the <a href="gdscript.html">GDScript reference</a> for every language feature.</p>
+  </div>
+</footer>
+
+<script src="js/data/nodes.js"></script>
+<script src="js/data/gdscript.js"></script>
+<script src="js/data/tutorials.js"></script>
+<script src="js/data/presets.js"></script>
+<script src="js/gdscript-runner.js"></script>
+<script src="js/main.js"></script>
+<script>
+(function () {
+  const editor = document.getElementById("editor");
+  const output = document.getElementById("output");
+  const runBtn = document.getElementById("runBtn");
+  const clearBtn = document.getElementById("clearBtn");
+  const resetBtn = document.getElementById("resetBtn");
+  const presetSel = document.getElementById("presetSel");
+
+  const presets = window.LG_PRESETS || [];
+  const gdItems = window.LG_GDSCRIPT || [];
+
+  // Build preset dropdown
+  function fillPresets() {
+    const parts = ['<option value="">— Load example —</option>'];
+    presets.forEach(p => {
+      parts.push('<option value="preset:' + p.id + '">' + p.name + '</option>');
+    });
+    // add GDScript examples
+    parts.push('<optgroup label="From GDScript reference">');
+    gdItems.forEach(g => {
+      if (g.example) parts.push('<option value="gd:' + g.id + '">' + g.name + '</option>');
+    });
+    parts.push('</optgroup>');
+    presetSel.innerHTML = parts.join("");
+  }
+
+  function loadCode(code) {
+    editor.value = code;
+    localStorage.setItem("lg-pg", code);
+  }
+
+  presetSel.addEventListener("change", () => {
+    const v = presetSel.value;
+    if (!v) return;
+    if (v.startsWith("preset:")) {
+      const p = presets.find(x => x.id === v.slice(7));
+      if (p) loadCode(p.code);
+    } else if (v.startsWith("gd:")) {
+      const g = gdItems.find(x => x.id === v.slice(3));
+      if (g && g.example) loadCode(g.example);
+    }
+    presetSel.value = "";
+  });
+
+  function appendOut(cls, text) {
+    const span = document.createElement("span");
+    span.className = cls;
+    span.textContent = text;
+    output.appendChild(span);
+    output.scrollTop = output.scrollHeight;
+  }
+
+  function run() {
+    output.innerHTML = "";
+    appendOut("info", "▶ Running…\n");
+    const t0 = performance.now();
+    const res = window.GDS.run(editor.value, appendOut);
+    const ms = Math.round(performance.now() - t0);
+    if (res.ok) appendOut("info", `\n✓ finished in ${ms} ms\n`);
+    else appendOut("info", `\n✗ stopped\n`);
+    localStorage.setItem("lg-pg", editor.value);
+  }
+
+  runBtn.addEventListener("click", run);
+  clearBtn.addEventListener("click", () => { output.innerHTML = ""; });
+  resetBtn.addEventListener("click", () => {
+    if (confirm("Reset editor to the Hello example?")) {
+      loadCode(presets[0].code);
+    }
+  });
+
+  editor.addEventListener("keydown", (e) => {
+    if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
+      e.preventDefault();
+      run();
+    }
+    // Tab inserts spaces instead of switching focus
+    if (e.key === "Tab") {
+      e.preventDefault();
+      const start = editor.selectionStart;
+      const end = editor.selectionEnd;
+      editor.value = editor.value.slice(0, start) + "    " + editor.value.slice(end);
+      editor.selectionStart = editor.selectionEnd = start + 4;
+    }
+  });
+  editor.addEventListener("input", () => {
+    localStorage.setItem("lg-pg", editor.value);
+  });
+
+  fillPresets();
+
+  // Initial content: URL ?load=<gdscript-id>, else saved, else first preset
+  const params = new URLSearchParams(location.search);
+  const loadId = params.get("load");
+  if (loadId) {
+    const g = gdItems.find(x => x.id === loadId);
+    if (g && g.example) { loadCode(g.example); return; }
+  }
+  const saved = localStorage.getItem("lg-pg");
+  if (saved) editor.value = saved;
+  else loadCode(presets[0].code);
+})();
+</script>
+</body>
+</html>

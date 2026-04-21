@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Learn Godot — Interactive Godot Engine Guide</title>
+<meta name="description" content="Interactive website to learn Godot Engine: every major node, GDScript features, examples, tutorials and a live code playground." />
+<link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+<header class="site-header">
+  <div class="container header-inner">
+    <a class="brand" href="index.html">
+      <span class="brand-mark">◆</span>
+      <span class="brand-name">Learn<strong>Godot</strong></span>
+    </a>
+    <nav class="main-nav" aria-label="Main">
+      <a href="index.html" class="active">Home</a>
+      <a href="nodes.html">Nodes</a>
+      <a href="gdscript.html">GDScript</a>
+      <a href="tutorials.html">Tutorials</a>
+      <a href="playground.html">Playground</a>
+      <a href="sandbox.html">Sandbox</a>
+    </nav>
+    <button class="theme-toggle" id="themeToggle" aria-label="Toggle theme">◐</button>
+  </div>
+</header>
+
+<main>
+  <section class="hero">
+    <div class="container">
+      <h1>Learn <span class="accent">Godot Engine</span> — the interactive way</h1>
+      <p class="lead">
+        An interactive guide to the Godot game engine. Explore every major node, learn GDScript,
+        try code in the browser, and follow step-by-step tutorials.
+      </p>
+      <div class="hero-actions">
+        <a class="btn btn-primary" href="tutorials.html">Start Learning →</a>
+        <a class="btn btn-ghost" href="playground.html">Open Playground</a>
+      </div>
+      <div class="hero-search">
+        <input type="search" id="heroSearch" placeholder="Search nodes, functions, tutorials…" />
+        <div id="heroSearchResults" class="search-results" hidden></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="container section">
+    <h2>What is Godot?</h2>
+    <p>
+      Godot is a free and open-source game engine used to make 2D and 3D games. It uses a
+      <em>scene-tree</em> architecture: every game is a tree of <strong>Nodes</strong>. Each node has a
+      job — draw a sprite, play a sound, detect collisions, run code — and nodes combine into
+      scenes that you reuse and instance.
+    </p>
+
+    <div class="cards">
+      <a class="card" href="nodes.html">
+        <h3>📦 Nodes</h3>
+        <p>Browse the node tree by category. Read what each node does, see properties,
+        common methods and a ready-to-use example.</p>
+      </a>
+      <a class="card" href="gdscript.html">
+        <h3>📝 GDScript</h3>
+        <p>The built-in scripting language. Syntax, built-in functions, signals, exports,
+        lifecycle callbacks — each with runnable examples.</p>
+      </a>
+      <a class="card" href="tutorials.html">
+        <h3>🎓 Tutorials</h3>
+        <p>Step-by-step interactive lessons: your first scene, player movement, signals,
+        physics, UI. Each lesson ends with a quick quiz.</p>
+      </a>
+      <a class="card" href="playground.html">
+        <h3>▶️ Playground</h3>
+        <p>Write GDScript in the browser and run a simulated interpreter. Load presets
+        for <code>print</code>, loops, functions and classes.</p>
+      </a>
+      <a class="card" href="sandbox.html">
+        <h3>🎮 Sandbox</h3>
+        <p>Run the <strong>real Godot editor</strong> in your browser (WebAssembly). Build
+        scenes, add nodes and press play — no install needed.</p>
+      </a>
+    </div>
+  </section>
+
+  <section class="container section">
+    <h2>How to read this site</h2>
+    <ol class="steps">
+      <li><strong>Start with Tutorials</strong> if you are new — they teach the core ideas in order.</li>
+      <li><strong>Use Nodes</strong> like a dictionary. Jump to a node, copy the example, paste into Godot.</li>
+      <li><strong>Use GDScript</strong> when you want to learn the language itself.</li>
+      <li><strong>Use Playground</strong> to test a small idea without opening Godot.</li>
+    </ol>
+  </section>
+
+  <section class="container section quick-start">
+    <h2>Quick example — a moving player</h2>
+    <p>Create a <code>CharacterBody2D</code> node, attach this script, and you have a top-down player.</p>
+<pre class="code"><code class="lang-gdscript">extends CharacterBody2D
+
+@export var speed: float = 200.0
+
+func _physics_process(delta: float) -&gt; void:
+    var input_dir := Input.get_vector("ui_left", "ui_right", "ui_up", "ui_down")
+    velocity = input_dir * speed
+    move_and_slide()</code></pre>
+    <p class="muted">
+      Every part of this example — <code>extends</code>, <code>@export</code>, <code>_physics_process</code>,
+      <code>Input.get_vector</code>, <code>move_and_slide</code> — is explained on this site.
+    </p>
+  </section>
+</main>
+
+<footer class="site-footer">
+  <div class="container">
+    <p>
+      Built as an interactive learning companion. Official docs:
+      <a href="https://docs.godotengine.org/en/stable/" target="_blank" rel="noopener">docs.godotengine.org</a>.
+    </p>
+    <p class="muted small">
+      Godot Engine is released under the MIT license. This site is an independent study aid.
+    </p>
+  </div>
+</footer>
+
+<script src="js/data/nodes.js"></script>
+<script src="js/data/gdscript.js"></script>
+<script src="js/data/tutorials.js"></script>
+<script src="js/main.js"></script>
+</body>
+</html>

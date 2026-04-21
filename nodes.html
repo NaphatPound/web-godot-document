@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Nodes Reference — Learn Godot</title>
+<link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+<header class="site-header">
+  <div class="container header-inner">
+    <a class="brand" href="index.html">
+      <span class="brand-mark">◆</span>
+      <span class="brand-name">Learn<strong>Godot</strong></span>
+    </a>
+    <nav class="main-nav">
+      <a href="index.html">Home</a>
+      <a href="nodes.html" class="active">Nodes</a>
+      <a href="gdscript.html">GDScript</a>
+      <a href="tutorials.html">Tutorials</a>
+      <a href="playground.html">Playground</a>
+      <a href="sandbox.html">Sandbox</a>
+    </nav>
+    <button class="theme-toggle" id="themeToggle">◐</button>
+  </div>
+</header>
+
+<div class="doc-layout">
+  <aside class="doc-sidebar">
+    <input type="search" id="nodeFilter" placeholder="Filter nodes…" />
+    <div id="nodeSidebar"></div>
+  </aside>
+  <main class="doc-content" id="nodeContent">
+    <p class="muted">Select a node on the left to see details.</p>
+  </main>
+</div>
+
+<footer class="site-footer">
+  <div class="container">
+    <p>Official reference: <a href="https://docs.godotengine.org/en/stable/classes/index.html" target="_blank" rel="noopener">Godot class reference</a>.</p>
+  </div>
+</footer>
+
+<script src="js/data/nodes.js"></script>
+<script src="js/data/gdscript.js"></script>
+<script src="js/data/tutorials.js"></script>
+<script src="js/main.js"></script>
+<script>
+(function () {
+  const sidebar = document.getElementById("nodeSidebar");
+  const content = document.getElementById("nodeContent");
+  const filter = document.getElementById("nodeFilter");
+  const nodes = window.LG_NODES || [];
+
+  function buildSidebar(query) {
+    const q = (query || "").trim().toLowerCase();
+    const byCat = {};
+    nodes.forEach(n => {
+      if (q && !(n.name.toLowerCase().includes(q) || (n.desc || "").toLowerCase().includes(q))) return;
+      const c = n.category || "Other";
+      (byCat[c] = byCat[c] || []).push(n);
+    });
+    const parts = [];
+    const cats = Object.keys(byCat).sort();
+    cats.forEach(cat => {
+      parts.push('<div class="sidebar-group"><h4>' + cat + '</h4><ul>');
+      byCat[cat].forEach(n => {
+        parts.push('<li><a data-id="' + n.id + '" href="#' + n.id + '">' + n.name + '</a></li>');
+      });
+      parts.push('</ul></div>');
+    });
+    sidebar.innerHTML = parts.join("") || '<p class="muted small">No matches.</p>';
+    sidebar.querySelectorAll("a[data-id]").forEach(a => {
+      a.addEventListener("click", (e) => {
+        e.preventDefault();
+        render(a.dataset.id);
+        history.replaceState(null, "", "#" + a.dataset.id);
+      });
+    });
+  }
+
+  function esc(s) { return String(s == null ? "" : s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
+
+  function render(id) {
+    const n = nodes.find(x => x.id === id);
+    if (!n) {
+      content.innerHTML = '<p class="muted">Select a node on the left.</p>';
+      return;
+    }
+    sidebar.querySelectorAll("a[data-id]").forEach(a => {
+      a.classList.toggle("active", a.dataset.id === id);
+    });
+
+    const parts = [];
+    parts.push('<h1>' + esc(n.name) + '</h1>');
+    parts.push('<div class="tag-row"><span class="chip">' + esc(n.category) + '</span></div>');
+    if (n.inherits) parts.push('<div class="inherit">Inherits: <code>' + esc(n.inherits) + '</code></div>');
+    parts.push('<p class="desc">' + esc(n.desc) + '</p>');
+
+    if (n.properties && n.properties.length) {
+      parts.push('<section class="doc-section"><h2>Properties</h2><table class="prop-table"><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>');
+      n.properties.forEach(p => {
+        parts.push('<tr><td class="name">' + esc(p.name) + '</td><td class="type">' + esc(p.type) + '</td><td>' + esc(p.desc) + '</td></tr>');
+      });
+      parts.push('</tbody></table></section>');
+    }
+
+    if (n.methods && n.methods.length) {
+      parts.push('<section class="doc-section"><h2>Methods</h2><table class="prop-table"><thead><tr><th>Signature</th><th>Description</th></tr></thead><tbody>');
+      n.methods.forEach(m => {
+        parts.push('<tr><td class="name">' + esc(m.sig) + '</td><td>' + esc(m.desc) + '</td></tr>');
+      });
+      parts.push('</tbody></table></section>');
+    }
+
+    if (n.signals && n.signals.length) {
+      parts.push('<section class="doc-section"><h2>Signals</h2><table class="prop-table"><thead><tr><th>Name</th><th>Description</th></tr></thead><tbody>');
+      n.signals.forEach(s => {
+        parts.push('<tr><td class="name">' + esc(s.name) + '</td><td>' + esc(s.desc) + '</td></tr>');
+      });
+      parts.push('</tbody></table></section>');
+    }
+
+    if (n.callbacks && n.callbacks.length) {
+      parts.push('<section class="doc-section"><h2>Lifecycle callbacks</h2><ul>');
+      n.callbacks.forEach(c => parts.push('<li><code>' + esc(c) + '</code></li>'));
+      parts.push('</ul></section>');
+    }
+
+    if (n.example) {
+      parts.push('<section class="doc-section"><h2>Example</h2><pre class="code"><code class="lang-gdscript">' + esc(n.example) + '</code></pre></section>');
+    }
+
+    parts.push('<section class="doc-section"><h2>Try it</h2><p class="muted">Copy this example into Godot: create a new scene, add a <code>' + esc(n.name.split("/")[0].trim()) + '</code> node, attach a new GDScript, and paste the code.</p></section>');
+
+    content.innerHTML = parts.join("");
+    if (window.LG && window.LG.highlight) window.LG.highlight(content);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
+  filter.addEventListener("input", () => buildSidebar(filter.value));
+  buildSidebar("");
+
+  const hashId = location.hash.replace("#", "");
+  const initial = hashId && nodes.find(n => n.id === hashId) ? hashId : (nodes[0] && nodes[0].id);
+  if (initial) render(initial);
+
+  window.addEventListener("hashchange", () => {
+    const id = location.hash.replace("#", "");
+    if (id) render(id);
+  });
+})();
+</script>
+</body>
+</html>
