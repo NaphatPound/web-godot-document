@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>AI Chat — Build Godot projects by describing them</title>
+<link rel="stylesheet" href="css/style.css" />
+<style>
+  .chat-wrap {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 22px 20px 40px;
+  }
+  .chat-head {
+    display: flex; justify-content: space-between; align-items: flex-start;
+    gap: 16px; flex-wrap: wrap; margin-bottom: 14px;
+  }
+  .chat-head h1 { margin: 0 0 6px; }
+  .chat-toolbar {
+    display: flex; gap: 8px; flex-wrap: wrap; align-items: center;
+  }
+  .chat-toolbar label {
+    font-size: 12px; color: var(--text-dim); margin-right: 4px;
+  }
+  .chat-toolbar select {
+    background: var(--panel); border: 1px solid var(--border);
+    color: var(--text); padding: 6px 10px; border-radius: 6px; font-size: 13px;
+  }
+
+  .chat-shell {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    display: flex; flex-direction: column;
+    min-height: 65vh;
+    overflow: hidden;
+  }
+  .chat-messages {
+    flex: 1;
+    padding: 18px 22px;
+    overflow-y: auto;
+    display: flex; flex-direction: column;
+    gap: 14px;
+    min-height: 300px;
+    max-height: 70vh;
+  }
+  .msg {
+    display: flex; gap: 10px; max-width: 92%;
+  }
+  .msg .avatar {
+    flex: 0 0 auto;
+    width: 30px; height: 30px;
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 14px; font-weight: 700;
+    background: var(--bg-3);
+    color: var(--text);
+  }
+  .msg.user .avatar  { background: var(--accent); color: #fff; }
+  .msg.assistant .avatar { background: #8b5cf6; color: #fff; }
+  .msg.system .avatar { background: transparent; color: var(--text-dim); }
+
+  .msg .bubble {
+    background: var(--bg-3);
+    padding: 10px 14px;
+    border-radius: 10px;
+    line-height: 1.55;
+    font-size: 14px;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+  }
+  .msg.user .bubble { background: var(--accent-soft); }
+  .msg.assistant .bubble { background: var(--bg-3); }
+
+  .msg .bubble pre {
+    background: var(--code-bg); border: 1px solid var(--code-border);
+    padding: 10px 12px; border-radius: 6px;
+    font-size: 12.5px; overflow-x: auto; margin: 8px 0;
+  }
+  .msg .bubble code { background: var(--code-bg); padding: 1px 5px; font-size: 12.5px; color: var(--accent-2); }
+  .msg .bubble pre code { padding: 0; background: transparent; color: var(--text); }
+
+  .project-card {
+    background: var(--panel);
+    border: 1px solid var(--accent);
+    border-radius: 10px;
+    padding: 12px 14px;
+    margin-top: 10px;
+  }
+  .project-card h4 { margin: 0 0 4px; font-size: 14px; color: var(--accent-2); }
+  .project-card .pfiles {
+    color: var(--text-dim); font-size: 12px; margin: 4px 0 10px;
+    font-family: "SF Mono", Menlo, monospace;
+  }
+  .project-card .pactions { display: flex; gap: 6px; flex-wrap: wrap; }
+  .project-card .btn { font-size: 13px; padding: 6px 12px; }
+
+  .chat-inputbar {
+    border-top: 1px solid var(--border);
+    padding: 12px 14px;
+    display: flex; gap: 8px; align-items: flex-end;
+    background: var(--panel);
+  }
+  .chat-inputbar textarea {
+    flex: 1;
+    resize: vertical;
+    min-height: 44px; max-height: 200px;
+    background: var(--bg-3);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--text);
+    padding: 10px 12px;
+    font-size: 14px;
+    font-family: inherit;
+    outline: none;
+  }
+  .chat-inputbar textarea:focus {
+    border-color: var(--accent-2);
+    box-shadow: 0 0 0 3px var(--accent-soft);
+  }
+
+  .suggest-row {
+    display: flex; gap: 6px; flex-wrap: wrap; padding: 10px 14px 0;
+  }
+  .suggest-chip {
+    background: var(--bg-3);
+    border: 1px solid var(--border);
+    color: var(--text-dim);
+    padding: 5px 10px;
+    border-radius: 14px;
+    font-size: 12px;
+    cursor: pointer;
+    transition: all 0.1s;
+  }
+  .suggest-chip:hover {
+    border-color: var(--accent-2);
+    color: var(--text);
+  }
+
+  .typing {
+    display: inline-flex; gap: 3px;
+  }
+  .typing span {
+    width: 6px; height: 6px; background: var(--text-dim); border-radius: 50%;
+    animation: blink 1.4s infinite both;
+  }
+  .typing span:nth-child(2) { animation-delay: 0.2s; }
+  .typing span:nth-child(3) { animation-delay: 0.4s; }
+  @keyframes blink {
+    0%, 80%, 100% { opacity: 0.2; }
+    40% { opacity: 1; }
+  }
+</style>
+</head>
+<body>
+<header class="site-header">
+  <div class="container header-inner">
+    <a class="brand" href="index.html">
+      <span class="brand-mark">◆</span>
+      <span class="brand-name">Learn<strong>Godot</strong></span>
+    </a>
+    <nav class="main-nav">
+      <a href="index.html">Home</a>
+      <a href="nodes.html">Nodes</a>
+      <a href="gdscript.html">GDScript</a>
+      <a href="tutorials.html">Tutorials</a>
+      <a href="playground.html">Playground</a>
+      <a href="sandbox.html">Sandbox</a>
+      <a href="chat.html" class="active">Chat</a>
+    </nav>
+    <button class="theme-toggle" id="themeToggle">◐</button>
+  </div>
+</header>
+
+<main class="chat-wrap">
+  <div class="chat-head">
+    <div>
+      <h1>AI Chat — describe a game, download it</h1>
+      <p class="muted" style="margin:0;max-width:640px;">
+        Describe the game you want and the AI will generate a complete Godot 4 project.
+        A <strong>Download</strong> button appears when it's ready — click to save the zip, or
+        <strong>Open in Godot</strong> to launch it in the Web Editor.
+      </p>
+    </div>
+    <div class="chat-toolbar">
+      <label for="modelSel">Model</label>
+      <select id="modelSel">
+        <option value="">(server default)</option>
+        <option value="qwen3-coder:480b-cloud">qwen3-coder:480b-cloud ✓</option>
+        <option value="gpt-oss:20b-cloud">gpt-oss:20b-cloud ✓</option>
+        <option value="gpt-oss:120b-cloud">gpt-oss:120b-cloud</option>
+        <option value="glm-5.1:cloud">glm-5.1:cloud (needs subscription)</option>
+      </select>
+      <button class="btn btn-ghost" id="resetBtn" title="Clear conversation">↻ New chat</button>
+    </div>
+  </div>
+
+  <div class="chat-shell">
+    <div class="chat-messages" id="messages"></div>
+
+    <div class="suggest-row" id="suggestRow">
+      <button class="suggest-chip" data-p="Make a simple 2D top-down player that moves with WASD.">Top-down player</button>
+      <button class="suggest-chip" data-p="Make a platformer with gravity, jumping, and two floating platforms.">Platformer</button>
+      <button class="suggest-chip" data-p="Create a scene with a button that spawns bouncing balls where I click.">Spawner</button>
+      <button class="suggest-chip" data-p="Make a click-the-coin game: a player moves with WASD and picks up 5 coins. Show a score label.">Pickup coins</button>
+      <button class="suggest-chip" data-p="Create a spinning 3D cube with a camera and a directional light.">3D cube</button>
+    </div>
+
+    <div class="chat-inputbar">
+      <textarea id="input" placeholder="Describe the game you want, e.g. 'a top-down shooter where the player moves with WASD and shoots bullets toward the mouse'…"></textarea>
+      <button class="btn btn-primary" id="sendBtn">Send ➤</button>
+    </div>
+  </div>
+
+  <p class="muted small" style="margin-top:14px;">
+    Tip: the AI is instructed to output project files in a fenced block. If it forgets, ask "Please give me the full project as a single zip-ready JSON block."
+    Projects are generated with SVG assets only (the Godot Web Editor currently hangs when importing zips with PNG files).
+  </p>
+</main>
+
+<footer class="site-footer">
+  <div class="container">
+    <p>Powered by <a href="https://ollama.com/" target="_blank" rel="noopener">Ollama Cloud</a>. API key stays on the server via the <code>/api/chat</code> proxy.</p>
+  </div>
+</footer>
+
+<script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+<script src="js/data/examples.js"></script>
+<script src="js/main.js"></script>
+<script src="js/chat.js"></script>
+</body>
+</html>

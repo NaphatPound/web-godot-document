@@ -1,0 +1,5 @@
+{
+  "ollama_api_key": "YOUR_OLLAMA_CLOUD_KEY_HERE",
+  "ollama_model": "glm-5.1:cloud",
+  "ollama_base_url": "https://ollama.com/v1"
+}
