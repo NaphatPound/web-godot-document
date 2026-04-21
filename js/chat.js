@@ -443,7 +443,7 @@ renderer/rendering_method.mobile="gl_compatibility"`;
       "4. Press F5 to play.");
   }
 
-  /* ---------- Sending ---------- */
+  /* ---------- Sending (streaming) ---------- */
   async function send(text) {
     if (!text || !text.trim()) return;
     addMessage("user", text);
@@ -458,15 +458,11 @@ renderer/rendering_method.mobile="gl_compatibility"`;
       }
     }
 
-    // Show a placeholder assistant message while waiting
-    const placeholder = document.createElement("div");
-    placeholder.className = "msg assistant";
-    placeholder.innerHTML = `<div class="avatar">AI</div><div class="bubble"><span class="typing"><span></span><span></span><span></span></span></div>`;
-    messagesEl.appendChild(placeholder);
-    scrollToBottom();
+    // Create an assistant message bubble that we will stream text into.
+    const { wrap: streamingMsg, bubble: streamingBubble } = makeStreamingMessage();
 
     try {
-      const body = { messages: apiMessages };
+      const body = { messages: apiMessages, stream: true };
       const model = modelSel.value;
       if (model) body.model = model;
 
@@ -476,23 +472,100 @@ renderer/rendering_method.mobile="gl_compatibility"`;
         body: JSON.stringify(body),
       });
 
-      placeholder.remove();
-
       if (!resp.ok) {
+        streamingMsg.remove();
         const err = await resp.json().catch(() => ({}));
         const msg = err.error || ("HTTP " + resp.status);
         addMessage("assistant", "⚠ " + msg);
         return;
       }
-      const data = await resp.json();
-      const content = data.content || "(empty response)";
-      addMessage("assistant", content);
+
+      const ct = (resp.headers.get("Content-Type") || "").toLowerCase();
+      let fullContent = "";
+
+      if (ct.includes("event-stream")) {
+        fullContent = await readSSE(resp, streamingBubble);
+      } else {
+        // Non-streaming fallback (server returned JSON).
+        const data = await resp.json();
+        fullContent = data.content || "(empty response)";
+        streamingBubble.textContent = fullContent;
+      }
+
+      // Replace the streaming bubble with a properly-rendered message
+      // (so markdown + project card render correctly).
+      streamingMsg.remove();
+      addMessage("assistant", fullContent);
     } catch (err) {
-      placeholder.remove();
+      streamingMsg.remove();
       addMessage("assistant", "⚠ Request failed: " + err.message);
     } finally {
       setBusy(false);
     }
+  }
+
+  function makeStreamingMessage() {
+    const wrap = document.createElement("div");
+    wrap.className = "msg assistant";
+    wrap.innerHTML = `
+      <div class="avatar">AI</div>
+      <div class="bubble">
+        <span class="stream-text"></span>
+        <span class="typing" style="margin-left:4px;"><span></span><span></span><span></span></span>
+      </div>`;
+    messagesEl.appendChild(wrap);
+    scrollToBottom();
+    const bubble = wrap.querySelector(".stream-text");
+    return { wrap, bubble };
+  }
+
+  async function readSSE(resp, bubble) {
+    const reader = resp.body.getReader();
+    const decoder = new TextDecoder("utf-8");
+    let buf = "";
+    let content = "";
+    let lastScroll = 0;
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buf += decoder.decode(value, { stream: true });
+
+      // Split on SSE event boundary (\n\n)
+      while (true) {
+        const idx = buf.indexOf("\n\n");
+        if (idx === -1) break;
+        const raw = buf.slice(0, idx);
+        buf = buf.slice(idx + 2);
+
+        // Each event may have several "data:" lines
+        for (const line of raw.split("\n")) {
+          const trimmed = line.startsWith("data:") ? line.slice(5).trim() : "";
+          if (!trimmed) continue;
+          if (trimmed === "[DONE]") continue;
+          let obj;
+          try { obj = JSON.parse(trimmed); } catch (e) { continue; }
+          // Error frame we injected server-side
+          if (obj.error) {
+            content += "\n\n⚠ " + obj.error;
+            bubble.textContent = content;
+            continue;
+          }
+          const delta = (((obj.choices || [])[0] || {}).delta || {}).content;
+          if (typeof delta === "string" && delta.length) {
+            content += delta;
+            bubble.textContent = content;
+            const now = performance.now();
+            if (now - lastScroll > 100) { // throttle auto-scroll
+              scrollToBottom();
+              lastScroll = now;
+            }
+          }
+        }
+      }
+    }
+    scrollToBottom();
+    return content;
   }
 
   function setBusy(b) {

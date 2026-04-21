@@ -65,7 +65,7 @@ class COIHandler(SimpleHTTPRequestHandler):
             return
         self.send_error(404, "Not found")
 
-    # ---- /api/chat proxy ----
+    # ---- /api/chat proxy (streaming SSE) ----
     def _handle_chat(self) -> None:
         try:
             length = int(self.headers.get("Content-Length", "0"))
@@ -76,7 +76,7 @@ class COIHandler(SimpleHTTPRequestHandler):
             return
 
         api_key = CONFIG.get("ollama_api_key", "").strip()
-        model = payload.get("model") or CONFIG.get("ollama_model", "glm-5.1:cloud")
+        model = payload.get("model") or CONFIG.get("ollama_model", "gpt-oss:20b-cloud")
         base_url = CONFIG.get("ollama_base_url", "https://ollama.com/v1").rstrip("/")
 
         if not api_key or api_key.startswith("YOUR_"):
@@ -88,10 +88,12 @@ class COIHandler(SimpleHTTPRequestHandler):
             self._json_error(400, "Payload must contain a non-empty 'messages' array.")
             return
 
+        stream = bool(payload.get("stream", True))
+
         req_body = {
             "model": model,
             "messages": messages,
-            "stream": False,
+            "stream": stream,
             "temperature": payload.get("temperature", 0.4),
             "max_tokens": payload.get("max_tokens", 4096),
         }
@@ -103,14 +105,14 @@ class COIHandler(SimpleHTTPRequestHandler):
             headers={
                 "Authorization": f"Bearer {api_key}",
                 "Content-Type": "application/json",
-                "Accept": "application/json",
+                "Accept": "text/event-stream" if stream else "application/json",
             },
         )
 
         try:
-            with urllib.request.urlopen(req, timeout=300) as resp:
-                raw = resp.read()
-                data = json.loads(raw.decode("utf-8"))
+            # Long timeout is OK because in streaming mode we're reading chunks
+            # — the OS socket read timeout applies per-chunk, not to the whole response.
+            resp = urllib.request.urlopen(req, timeout=900)
         except urllib.error.HTTPError as e:
             body = e.read().decode("utf-8", errors="replace")
             self._json_error(e.code, f"Upstream error: {body}")
@@ -119,25 +121,63 @@ class COIHandler(SimpleHTTPRequestHandler):
             self._json_error(502, f"Upstream request failed: {e}")
             return
 
-        # OpenAI-style response: { choices: [{ message: { role, content } }] }
+        if stream:
+            self._stream_sse(resp, model)
+        else:
+            self._send_single(resp, model)
+
+    def _stream_sse(self, resp, model: str) -> None:
+        """Forward Ollama's SSE stream straight to the browser."""
+        self.send_response(200)
+        self.send_header("Content-Type", "text/event-stream; charset=utf-8")
+        self.send_header("Cache-Control", "no-cache, no-transform")
+        self.send_header("X-Accel-Buffering", "no")
+        self.send_header("Access-Control-Allow-Origin", "*")
+        self.end_headers()
+        try:
+            # Read line by line — each SSE event ends with a blank line.
+            for line in resp:
+                if not line:
+                    continue
+                try:
+                    self.wfile.write(line)
+                    self.wfile.flush()
+                except (BrokenPipeError, ConnectionResetError):
+                    break
+        except Exception as e:
+            # Best-effort error signal at end of stream
+            try:
+                err = f"data: {{\"error\": \"{str(e)}\"}}\n\n".encode("utf-8")
+                self.wfile.write(err)
+                self.wfile.flush()
+            except Exception:
+                pass
+        finally:
+            try:
+                resp.close()
+            except Exception:
+                pass
+
+    def _send_single(self, resp, model: str) -> None:
+        try:
+            raw = resp.read()
+            data = json.loads(raw.decode("utf-8"))
+        except Exception as e:
+            self._json_error(502, f"Parse failed: {e}")
+            return
         content = ""
         try:
             content = data["choices"][0]["message"]["content"]
         except Exception:
             content = json.dumps(data)
-
-        out = {
-            "content": content,
-            "model": data.get("model", model),
-            "usage": data.get("usage"),
-        }
-        payload_bytes = json.dumps(out).encode("utf-8")
+        out = {"content": content, "model": data.get("model", model), "usage": data.get("usage")}
+        body_bytes = json.dumps(out).encode("utf-8")
         self.send_response(200)
         self.send_header("Content-Type", "application/json")
-        self.send_header("Content-Length", str(len(payload_bytes)))
+        self.send_header("Content-Length", str(len(body_bytes)))
         self.send_header("Access-Control-Allow-Origin", "*")
         self.end_headers()
-        self.wfile.write(payload_bytes)
+        self.wfile.write(body_bytes)
 
     def _json_error(self, code: int, msg: str) -> None:
         body = json.dumps({"error": msg}).encode("utf-8")
